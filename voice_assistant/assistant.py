@@ -1,4 +1,5 @@
 import asyncio
+import time
 import numpy as np
 import sounddevice as sd
 import sherpa_onnx
@@ -37,12 +38,13 @@ async def listen_and_transcribe(
         language="ru",
         speaker="v5_ru",
     )
+    time.sleep(0.25)
     print("Здравствуйте, "+("сэр." if config.SEX=='male' else "мэм."))
-    await utils.run_blocking(audio.tovoice, ttsmodel, random.choice(["Здравствуйте, "+("сээр." if config.SEX=='male' else "мээм."), "Приветствую, "+("сээр." if config.SEX=='male' else "мээм.")]) + "Прошу немного подождать - я подготавливаю данные.")
+    await audio.speak_interruptible(ttsmodel, random.choice(["Здравствуйте, "+("сээр." if config.SEX=='male' else "мээм."), "Приветствую, "+("сээр." if config.SEX=='male' else "мээм.")]) + "Прошу немного подождать - я подготавливаю данные.", listener)
     qwenny = llm.QwenChat()
     qwenny.add_system(config.keyphr["scs"])
     command_classifier = command_processor.CommandClassifier()
-    await utils.run_blocking(audio.tovoice, ttsmodel, "Данные готовы к работе, "+("сэр." if config.SEX=='male' else "мэм."))
+    await audio.speak_interruptible(ttsmodel, "Данные готовы к работе, "+("сэр." if config.SEX=='male' else "мэм."), listener)
 
     while not listener._queue.empty():
         try:
@@ -109,7 +111,7 @@ async def listen_and_transcribe(
             print(text)
             isend, _ = await utils.check_sim(text, config.keyphr["stdn"])
             if isend:
-                await utils.run_blocking(audio.tovoice, ttsmodel, "До свидания, "+("сэр." if config.SEX=='male' else "мэм.")+"!")
+                await audio.speak_interruptible(ttsmodel, "До свидания, "+("сэр." if config.SEX=='male' else "мэм.")+"!", listener)
                 return ""
 
             words_in_text = text.split()
@@ -123,7 +125,7 @@ async def listen_and_transcribe(
                 if command_text.strip():
                     await command_executor.process_commands(command_text, ttsmodel, qwenny, listener, command_classifier)
                 else:
-                    await utils.run_blocking(audio.tovoice, ttsmodel, random.choice(["Слушаю, "+("сэр." if config.SEX=='male' else "мэм."), "Да, "+("сэр." if config.SEX=='male' else "мэм.")]))
+                    await audio.speak_interruptible(ttsmodel, random.choice(["Слушаю, "+("сэр." if config.SEX=='male' else "мэм."), "Да, "+("сэр." if config.SEX=='male' else "мэм.")]), listener)
 
                 await audio.reset_audio_state(listener, preroll_frames)
                 vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=30)
@@ -134,9 +136,9 @@ async def listen_and_transcribe(
                 response_g = utils.replace_numbers(response)
                 print(qwenny.messages[-1])
     
-                await utils.run_blocking(audio.tovoice, ttsmodel, response_g)
+                await audio.speak_interruptible(ttsmodel, response_g, listener)
             else:
-                await utils.run_blocking(audio.tovoice, ttsmodel, random.choice(["Не расслышал вас, "+("сэр." if config.SEX=='male' else "мэм."), "Не понял вас, "+("сэр." if config.SEX=='male' else "мэм.")]))
+                await audio.speak_interruptible(ttsmodel, random.choice(["Не расслышал вас, "+("сэр." if config.SEX=='male' else "мэм."), "Не понял вас, "+("сэр." if config.SEX=='male' else "мэм.")]), listener)
 
             await audio.reset_audio_state(listener, preroll_frames)
             vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=30)

@@ -21,10 +21,10 @@ menu_process = None
 opened_apps = {}
 remembered_messages = {}
 
-def open_menu(ttsmodel):
+async def open_menu(ttsmodel):
     apps = utils.get_installed_apps()
     if not apps:
-        audio.tovoice(ttsmodel, "Приложения не найдены, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Приложения не найдены, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
         return
 
     try:
@@ -58,7 +58,7 @@ def open_menu(ttsmodel):
             proc.stdin.write(menu_text.encode("utf-8"))
             proc.stdin.close()
             menu_process = proc
-            audio.tovoice(ttsmodel, "Меню открыто.")
+            await audio.speak_interruptible(ttsmodel, "Меню открыто.", assistant.listener)
         elif shutil.which("zenity"):
             proc = subprocess.Popen(
                 ["zenity", "--text-info", "--title=Приложения", "--width=400", "--height=500"],
@@ -70,24 +70,24 @@ def open_menu(ttsmodel):
             proc.stdin.write(menu_text.encode("utf-8"))
             proc.stdin.close()
             menu_process = proc
-            audio.tovoice(ttsmodel, "Меню открыто.")
+            await audio.speak_interruptible(ttsmodel, "Меню открыто.", assistant.listener)
         elif shutil.which("notify-send"):
             subprocess.Popen(
                 ["notify-send", "-t", "0", "Меню приложений", menu_text],
                 start_new_session=True,
             )
             menu_process = None
-            audio.tovoice(ttsmodel, "Лаунчер не найден, список приложений показан уведомлением.")
+            await audio.speak_interruptible(ttsmodel, "Лаунчер не найден, список приложений показан уведомлением.", assistant.listener)
         else:
             print(menu_text)
             menu_process = None
-            audio.tovoice(ttsmodel, "Не нашёл ни одного лаунчера меню, список выведен в консоль.")
+            await audio.speak_interruptible(ttsmodel, "Не нашёл ни одного лаунчера меню, список выведен в консоль.", assistant.listener)
     except Exception as e:
         print(f"[error] _open_menu_linux: {e}")
-        audio.tovoice(ttsmodel, "Не удалось открыть меню.")
+        await audio.speak_interruptible(ttsmodel, "Не удалось открыть меню.", assistant.listener)
 
 
-def close_menu(ttsmodel):
+async def close_menu(ttsmodel):
     global menu_process
     closed = False
     if menu_process is not None and menu_process.poll() is None:
@@ -109,37 +109,37 @@ def close_menu(ttsmodel):
     except FileNotFoundError:
         pass
 
-    audio.tovoice(ttsmodel, "Меню закрыто, "+("сэр." if config.SEX=='male' else "мэм.") if closed else "Открытое меню не найдено "+("сэр." if config.SEX=='male' else "мэм."))
+    await audio.speak_interruptible(ttsmodel, "Меню закрыто, "+("сэр." if config.SEX=='male' else "мэм.") if closed else "Открытое меню не найдено "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
 
 
 
 
-def remember_app(number_word: str, app_name: str, ttsmodel):
+async def remember_app(number_word: str, app_name: str, ttsmodel):
     number = utils.parse_number(number_word)
     if not os.path.exists(config.LAST_MENU_FILE):
-        audio.tovoice(ttsmodel, ("сэр." if config.SEX=='male' else "мэм.") + ", сначала откройте меню командой  Открой меню")
+        await audio.speak_interruptible(ttsmodel, ("сэр." if config.SEX=='male' else "мэм.") + ", сначала откройте меню командой  Открой меню", assistant.listener)
         return
 
     try:
         with open(config.LAST_MENU_FILE, "r", encoding="utf-8") as f:
             apps = json.load(f)
     except Exception:
-        audio.tovoice(ttsmodel, "Не удалось прочитать список меню, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Не удалось прочитать список меню, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
         return
 
     if number is None or number < 1 or number > len(apps):
-        audio.tovoice(ttsmodel, "Не удалось распознать номер приложения, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Не удалось распознать номер приложения, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
         return
     app_display_name, exec_cmd = apps[number - 1]
     app_name = app_name.strip()
     if not app_name:
-        audio.tovoice(ttsmodel, "Не расслышал имя для приложения, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Не расслышал имя для приложения, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
         return
     known = utils.load_known_apps()
     known[app_name.lower()] = {"exec": exec_cmd, "display_name": app_display_name}
     utils.save_known_apps(known)
 
-    audio.tovoice(ttsmodel, f"Запомнил приложение {app_name} с номером {number_word}.")
+    await audio.speak_interruptible(ttsmodel, f"Запомнил приложение {app_name} с номером {number_word}.", assistant.listener)
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -147,7 +147,7 @@ def remember_app(number_word: str, app_name: str, ttsmodel):
 #     match = config._FILE_READ_RE.match(command_text.strip())
 #     if not match:
 #         await utils.run_blocking(
-#             audio.tovoice, ttsmodel,
+#             audio.speak_interruptible, ttsmodel,
 #             "Не понял, какой файл и какие строки читать, "+("сэр." if config.SEX=='male' else "мэм."). Скажите, "
 #             "например: прочитай файл заметки от пяти до десяти.",
 #         )
@@ -157,14 +157,14 @@ def remember_app(number_word: str, app_name: str, ttsmodel):
 #     start = utils.parse_number(from_word.strip())
 #     end = utils.parse_number(to_word.strip())
 #     if not start or not end:
-#         await utils.run_blocking(audio.tovoice, ttsmodel, "Не расслышал номера строк, "+("сэр." if config.SEX=='male' else "мэм."))
+#         await audio.speak_interruptible(ttsmodel, "Не расслышал номера строк, "+("сэр." if config.SEX=='male' else "мэм."))
 #         return
 #     if start > end:
 #         start, end = end, start
 
 #     path = await utils.run_blocking(utils._find_readable_file, raw_name)
 #     if path is None:
-#         await utils.run_blocking(audio.tovoice, ttsmodel, f"Не нашёл файл {raw_name}, "+("сэр." if config.SEX=='male' else "мэм."))
+#         await audio.speak_interruptible(ttsmodel, f"Не нашёл файл {raw_name}, "+("сэр." if config.SEX=='male' else "мэм."))
 #         return
 
 #     try:
@@ -172,21 +172,21 @@ def remember_app(number_word: str, app_name: str, ttsmodel):
 #             lines = f.readlines()
 #     except Exception as e:
 #         print(f"[file] ошибка чтения {path}: {e}")
-#         await utils.run_blocking(audio.tovoice, ttsmodel, "Не удалось прочитать файл, "+("сэр." if config.SEX=='male' else "мэм."))
+#         await audio.speak_interruptible(ttsmodel, "Не удалось прочитать файл, "+("сэр." if config.SEX=='male' else "мэм."))
 #         return
 
 #     start_idx = max(1, start) - 1
 #     end_idx = min(len(lines), end)
 #     if start_idx >= end_idx:
-#         await utils.run_blocking(audio.tovoice, ttsmodel, "Указанный диапазон строк пуст, "+("сэр." if config.SEX=='male' else "мэм."))
+#         await audio.speak_interruptible(ttsmodel, "Указанный диапазон строк пуст, "+("сэр." if config.SEX=='male' else "мэм."))
 #         return
 
 #     chunk_text = "".join(lines[start_idx:end_idx]).strip()
 #     if not chunk_text:
-#         await utils.run_blocking(audio.tovoice, ttsmodel, "В этом диапазоне строк ничего нет, "+("сэр." if config.SEX=='male' else "мэм."))
+#         await audio.speak_interruptible(ttsmodel, "В этом диапазоне строк ничего нет, "+("сэр." if config.SEX=='male' else "мэм."))
 #         return
 
-#     await utils.run_blocking(audio.tovoice, ttsmodel, f"Читаю {path.name}, строки {start} - {end}.")
+#     await audio.speak_interruptible(ttsmodel, f"Читаю {path.name}, строки {start} - {end}.")
 
 #     for sentence in config._SENTENCE_BOUNDARY_RE.split(chunk_text):
 #         sentence = sentence.strip()
@@ -200,7 +200,7 @@ async def open_app(app_name: str, ttsmodel):
     app_name = app_name.strip()
     known = utils.load_known_apps()
     if not app_name or not known:
-        await utils.run_blocking(audio.tovoice, ttsmodel, "Приложение не найдено, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Приложение не найдено, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
         return
 
     best_key = None
@@ -212,7 +212,7 @@ async def open_app(app_name: str, ttsmodel):
             best_key = key
 
     if best_key is None or best_score < 70:
-        await utils.run_blocking(audio.tovoice, ttsmodel, "Приложение не найдено, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Приложение не найдено, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
         return
     exec_cmd = known[best_key]["exec"]
     display_name = known[best_key].get("display_name", best_key)
@@ -224,10 +224,10 @@ async def open_app(app_name: str, ttsmodel):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        await utils.run_blocking(audio.tovoice, ttsmodel, f"Открываю {display_name}.")
+        await audio.speak_interruptible(ttsmodel, f"Открываю {display_name}.", assistant.listener)
     except Exception as e:
         print(f"[error] open_app: {e}")
-        await utils.run_blocking(audio.tovoice, ttsmodel, "Не удалось запустить приложение, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Не удалось запустить приложение, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
 
 
 async def close_app(app_name: str, ttsmodel):
@@ -240,7 +240,7 @@ async def close_app(app_name: str, ttsmodel):
             bestrate = rate
             bestname = key
     if bestrate < 70:
-        audio.tovoice(ttsmodel, f"Приложение {app_name} не найдено, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, f"Приложение {app_name} не найдено, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
         return
     app_name = bestname
     app_proc = opened_apps.get(app_name, None)
@@ -254,12 +254,12 @@ async def close_app(app_name: str, ttsmodel):
             except subprocess.TimeoutExpired:
                 app_proc.kill()
         except Exception:
-            audio.tovoice(ttsmodel, "Не могу закрыть приложение, "+("сэр." if config.SEX=='male' else "мэм."))
+            await audio.speak_interruptible(ttsmodel, "Не могу закрыть приложение, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
         app_proc = None
     else: 
-        audio.tovoice(ttsmodel, f"Приложение {app_name} не найдено, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, f"Приложение {app_name} не найдено, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
         return
-    audio.tovoice(ttsmodel, f"Приложение {app_name} закрыто, "+("сэр." if config.SEX=='male' else "мэм."))
+    await audio.speak_interruptible(ttsmodel, f"Приложение {app_name} закрыто, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
 
     
 async def list_apps(ttsmodel):
@@ -269,25 +269,23 @@ async def list_apps(ttsmodel):
         print(opened_apps[key].pid)
         allapps += f", {key}"
     if len(allapps) == 0:
-        audio.tovoice(ttsmodel, "Открытых мною приложений нет, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Открытых мною приложений нет, "+("сэр." if config.SEX=='male' else "мэм."), assistant.listener)
     else:
-        audio.tovoice(ttsmodel, allapps)
+        await audio.speak_interruptible(ttsmodel, allapps, assistant.listener)
 
 
 async def read_screen_command(ttsmodel, qwenny, listener, summarize: bool, question: str):
     ocr_text = await utils.run_blocking(utils._capture_screen_ocr)
 
     if ocr_text == "__NO_SCREENSHOT_TOOL__":
-        await utils.run_blocking(
-            audio.tovoice, ttsmodel,
-            "Не нашёл инструмент для скриншота, "+("сэр." if config.SEX=='male' else "мэм.")+"Нужен grim, scrot или imagemagick.",
-        )
+        await audio.speak_interruptible(ttsmodel,
+            "Не нашёл инструмент для скриншота, "+("сэр." if config.SEX=='male' else "мэм.")+"Нужен grim, scrot или imagemagick.", listener)
         return
     if ocr_text == "__NO_TESSERACT__":
-        await utils.run_blocking(audio.tovoice, ttsmodel, "Для чтения экрана нужен tesseract, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Для чтения экрана нужен tesseract, "+("сэр." if config.SEX=='male' else "мэм."), listener)
         return
     if ocr_text in ("__CAPTURE_FAILED__", "__OCR_FAILED__") or not ocr_text.strip():
-        await utils.run_blocking(audio.tovoice, ttsmodel, "Не удалось распознать текст на экране, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Не удалось распознать текст на экране, "+("сэр." if config.SEX=='male' else "мэм."), listener)
         return
 
     if not summarize:
@@ -297,6 +295,7 @@ async def read_screen_command(ttsmodel, qwenny, listener, summarize: bool, quest
             f"\n\nВопрос: \n{question}"
         )
         async for sentence in qwenny.ask_stream(prompt):
+            print(sentence)
             sentence_g = utils.replace_numbers(sentence)
             if sentence_g.strip():
                 if await audio.speak_interruptible(ttsmodel, sentence_g, listener):
@@ -337,12 +336,12 @@ async def process_commands(command_text: str, ttsmodel, qwenny, listener, classi
 
         matched, _ = await utils.check_sim(" ".join(words[:2]), "открой меню")
         if matched and _ == 100:
-            open_menu(ttsmodel)
+            await open_menu(ttsmodel)
             continue
 
         matched, _ = await utils.check_sim(" ".join(words[:2]), "закрой меню")
         if matched and _ == 100:
-            close_menu(ttsmodel)
+            await close_menu(ttsmodel)
             continue
 
         matched, _ = await utils.check_sim(" ".join(words[:2]), "запомни номер")
@@ -352,7 +351,7 @@ async def process_commands(command_text: str, ttsmodel, qwenny, listener, classi
                 last_num += 1
             number_word = " ".join(words[2:last_num])
             app_name = " ".join(words[last_num:])
-            remember_app(number_word, app_name, ttsmodel)
+            await remember_app(number_word, app_name, ttsmodel)
             continue
 
         # matched, _ = await utils.check_sim(" ".join(words[:2]), "прочитай файл")
@@ -387,12 +386,12 @@ async def process_commands(command_text: str, ttsmodel, qwenny, listener, classi
         matched, _ = await utils.check_sim(" ".join(words[:2]), "начни диалог")
         if matched and _ == 100:
             assistant.is_qwenny = True
-            audio.tovoice(ttsmodel, random.choice(["Спрашивайте, "+("сэр." if config.SEX=='male' else "мэм."), "К вашим услугам, "+("сэр." if config.SEX=='male' else "мэм.")]))
+            await audio.speak_interruptible(ttsmodel, random.choice(["Спрашивайте, "+("сэр." if config.SEX=='male' else "мэм."), "К вашим услугам, "+("сэр." if config.SEX=='male' else "мэм.")]), listener)
             continue
             
         matched, _ = await utils.check_sim(" ".join(words[:2]), "заверши диалог")
         if matched and _ == 100:
-            audio.tovoice(ttsmodel, "Диалог завершен, "+("сэр." if config.SEX=='male' else "мэм."))
+            await audio.speak_interruptible(ttsmodel, "Диалог завершен, "+("сэр." if config.SEX=='male' else "мэм."), listener)
             assistant.is_qwenny = False
             continue
 
@@ -402,7 +401,7 @@ async def process_commands(command_text: str, ttsmodel, qwenny, listener, classi
             continue
 
         print(f"[jarvis] команда не распознана: {segment!r}")
-        audio.tovoice(ttsmodel, "Повторите команду, "+("сэр." if config.SEX=='male' else "мэм."))
+        await audio.speak_interruptible(ttsmodel, "Повторите команду, "+("сэр." if config.SEX=='male' else "мэм."), listener)
 
 # async def process_commands(command_text: str, ttsmodel, qwenny, listener, classifier):
 #     global is_qwenny
@@ -480,11 +479,11 @@ async def process_commands(command_text: str, ttsmodel, qwenny, listener, classi
     
 #         if pred[1][0] == "начни диалог" and pred[1][1] >= 0.8:
 #             is_qwenny = True
-#             audio.tovoice(ttsmodel, random.choice(["Спрашивайте, "+("сэр." if config.SEX=='male' else "мэм."), "К вашим услугам, "+("сэр." if config.SEX=='male' else "мэм.")]))
+#             audio.speak_interruptible(ttsmodel, random.choice(["Спрашивайте, "+("сэр." if config.SEX=='male' else "мэм."), "К вашим услугам, "+("сэр." if config.SEX=='male' else "мэм.")]))
 #             continue
             
 #         if pred[1][0] == "заверши диалог" and pred[1][1] >= 0.8:
-#             audio.tovoice(ttsmodel, "Диалог завершен, "+("сэр." if config.SEX=='male' else "мэм."))
+#             audio.speak_interruptible(ttsmodel, "Диалог завершен, "+("сэр." if config.SEX=='male' else "мэм."))
 #             is_qwenny = False
 #             continue
 
@@ -493,4 +492,4 @@ async def process_commands(command_text: str, ttsmodel, qwenny, listener, classi
 #             continue
 
 #         print(f"[jarvis] команда не распознана: {segment!r}")
-#         audio.tovoice(ttsmodel, "Повторите команду, "+("сэр." if config.SEX=='male' else "мэм."))
+#         audio.speak_interruptible(ttsmodel, "Повторите команду, "+("сэр." if config.SEX=='male' else "мэм."))

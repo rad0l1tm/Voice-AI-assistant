@@ -29,10 +29,10 @@ class HeedWakeWordListener:
         self.input_name = self.session.get_inputs()[0].name
 
         self.threshold = self.meta["threshold"]
-        self.consecutive_needed = self.meta.get("trigger", {}).get("consecutive_frames", 2)
-        self.refractory_seconds = self.meta.get("trigger", {}).get("refractory_seconds", 0.7)
+        self.consecutive_needed = self.meta.get("trigger", {}).get("consecutive_frames", 3)
+        self.refractory_seconds = self.meta.get("trigger", {}).get("refractory_seconds", 1)
 
-        self._buffer = np.zeros(config.WINDOW_SAMPLES, dtype=np.float32)
+        self._buffer = np.empty(0, dtype=np.float32)
         self._new_samples = 0  
 
         self._consecutive = 0
@@ -41,8 +41,18 @@ class HeedWakeWordListener:
         self._queue: asyncio.Queue[np.ndarray] = asyncio.Queue()
         self._loop = asyncio.get_event_loop()
         self._stream: sd.InputStream | None = None
-
-
+    
+    def reset(self):
+        self._buffer = np.empty(0, dtype=np.float32)
+        self._new_samples = 0
+        self._consecutive = 0
+    
+        # Удаляем уже накопившийся звук
+        while True:
+            try:
+                self._queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
     def _audio_callback(self, indata, frames, time_info, status):
         if audio.is_speaking:
             return
@@ -104,13 +114,23 @@ class HeedWakeWordListener:
         while True:
             chunk = await self._queue.get()
 
-            n = len(chunk)
-            self._buffer = np.concatenate([self._buffer, chunk])[-config.WINDOW_SAMPLES:]
-            self._new_samples += n
-
+            self._buffer = np.concatenate([
+                self._buffer,
+                chunk
+            ])
+    
+            if len(self._buffer) > config.WINDOW_SAMPLES:
+                self._buffer = self._buffer[-config.WINDOW_SAMPLES:]
+    
+            self._new_samples += len(chunk)
+    
+            if len(self._buffer) < config.WINDOW_SAMPLES:
+                continue
+    
             if self._new_samples < config.HOP_SAMPLES:
                 continue
-            self._new_samples = 0
+    
+            self._new_samples -= config.HOP_SAMPLES
 
             if not self._energy_gate_pass(self._buffer[-config.HOP_SAMPLES:]):
                 self._consecutive = 0
@@ -130,4 +150,6 @@ class HeedWakeWordListener:
             ):
                 self._last_trigger_time = now
                 self._consecutive = 0
-                return Detection(self.name, prob)
+                detection = Detection(self.name, prob)
+                self.reset()
+                return detection

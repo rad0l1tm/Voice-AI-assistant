@@ -14,6 +14,7 @@ from voice_assistant import stt
 from voice_assistant import wakeword 
 from voice_assistant import assistant 
 from voice_assistant import load_dependences
+
 async def main():
     parser = argparse.ArgumentParser(description="Голосовой ассистент")
     parser.add_argument("--llm-model", help="Путь к llm-модели", default = config.PROJECT_DIR / "Qwen3.5-4B-Q4_K_M.gguf")
@@ -61,6 +62,7 @@ async def main():
             if not isawaken:
                 await listener.wait_for_detection()
                 break
+        assistant.listener = listener
         await assistant.listen_and_transcribe(listener, stt_, config.COMMAND_LISTEN_SECONDS, args.vad_model)
 
 

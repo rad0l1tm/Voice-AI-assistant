@@ -6,6 +6,7 @@ import re
 from num2words import num2words
 import unicodedata
 from scipy.signal import butter, sosfilt
+import threading
 
 from voice_assistant import config
 from voice_assistant import utils
@@ -72,7 +73,7 @@ def apply_metallic_effect(audio: np.ndarray, sample_rate: int, carrier_freq: flo
 
 def tovoice(model, text):
     global is_speaking
-    is_speaking = True
+    is_speaking = False
     try:
         audio = model.apply_tts(
             text=text,
@@ -83,10 +84,10 @@ def tovoice(model, text):
         audio_np = apply_warmth(audio_np, 24000, bass_boost=0.75, treble_cut=0.45)
         audio_np = apply_room_tone(audio_np, 24000, delay_ms=35, decay=0.15)
         audio_np = apply_metallic_effect(audio_np, 24000, carrier_freq=30, mix=0.05)
-
-        sd.play(audio_np, 24000)
+        return audio_np, 24000
+        # sd.play(audio_np, 24000)
         # sd.play(audio_np, int(config.SAMPLE_RATE * config.SLOW_FACTOR))
-        sd.wait()
+        # sd.wait()
     finally:
         time.sleep(0.25)
         is_speaking = False
@@ -102,28 +103,109 @@ async def reset_audio_state(listener, preroll_frames):
         preroll_frames.clear()
         
 
-async def speak_interruptible(ttsmodel, text: str, listener: "wakeword.HeedWakeWordListener") -> bool:
+# async def speak_interruptible(ttsmodel, text: str, listener: "wakeword.HeedWakeWordListener") -> bool:
+
+#     if not text.strip():
+#         return False
+
+#     tts_task = asyncio.create_task(utils.run_blocking(tovoice, ttsmodel, text))
+
+#     if not config.ENABLE_BARGE_IN:
+#         print("scielence")
+#         await tts_task
+#         return False
+
+#     barge_task = asyncio.create_task(listener.wait_for_detection())
+#     done, _pending = await asyncio.wait(
+#         {tts_task, barge_task}, return_when=asyncio.FIRST_COMPLETED
+#     )
+
+#     if barge_task in done:
+#         sd.stop() 
+#         await tts_task
+#         return True
+
+#     barge_task.cancel()
+#     try:
+#         await barge_task
+#     except asyncio.CancelledError:
+#         pass
+#     return False
+# def play_audio(audio, sr):
+#     sd.play(audio, sr)
+#     sd.wait()
+#     time.sleep(0.25)
+#     return
+
+def play_audio(audio, sr, stop_event: threading.Event):
+    print("PLAY START", len(audio) / sr)
+    chunk_size = int(sr * 0.05)  # 50 мс
+    with sd.OutputStream(
+        samplerate=sr,
+        channels=1,
+        dtype="float32",
+    ) as stream:
+
+        for i in range(0, len(audio), chunk_size):
+            if stop_event.is_set():
+                print("PLAY INTERRUPTED")
+                break
+
+            chunk = audio[i:i + chunk_size]
+            stream.write(chunk)
+
+    print("PLAY END")
+    
+async def speak_interruptible(
+    ttsmodel,
+    text: str,
+    listener,
+) -> bool:
 
     if not text.strip():
         return False
-
-    tts_task = asyncio.create_task(utils.run_blocking(tovoice, ttsmodel, text))
-
-    if not config.ENABLE_BARGE_IN:
-        await tts_task
-        return False
-
-    barge_task = asyncio.create_task(listener.wait_for_detection())
-    done, _pending = await asyncio.wait(
-        {tts_task, barge_task}, return_when=asyncio.FIRST_COMPLETED
+    audio, sr = await utils.run_blocking(
+        tovoice,
+        ttsmodel,
+        text,
     )
-
+    if not config.ENABLE_BARGE_IN:
+        await utils.run_blocking(
+            play_audio,
+            audio,
+            sr,
+            threading.Event(),
+        )
+        return False
+    stop_event = threading.Event()
+    play_task = asyncio.create_task(
+        utils.run_blocking(
+            play_audio,
+            audio,
+            sr,
+            stop_event,
+        )
+    )
+    listener.reset()
+    barge_task = asyncio.create_task(
+        listener.wait_for_detection()
+    )
+    done, pending = await asyncio.wait(
+        {play_task, barge_task},
+        return_when=asyncio.FIRST_COMPLETED,
+    )
     if barge_task in done:
-        sd.stop() 
-        await tts_task
+        # print("im mogged")
+        stop_event.set()
+        await play_task
+        listener.reset()
+        await asyncio.sleep(0.2)
+        listener.reset()
         return True
+    # print("finish")
 
     barge_task.cancel()
+
     try:
         await barge_task
     except asyncio.CancelledError:
