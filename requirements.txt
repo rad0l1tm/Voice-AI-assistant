@@ -1,0 +1,14 @@
+torch
+numpy
+onnxruntime
+sounddevice
+pymorphy3
+vosk
+piper-tts
+sherpa-onnx
+rapidfuzz
+llama-cpp-python
+silero
+num2words
+heed-wakeword
+sentence-transformers
