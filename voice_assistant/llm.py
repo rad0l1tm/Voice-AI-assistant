@@ -1,4 +1,5 @@
 import asyncio
+import os
 from llama_cpp import Llama
 import threading
 
@@ -6,10 +7,10 @@ from voice_assistant import config
 
 
 class QwenChat:
-    def __init__(self, mod_path : str = config.LLM_MODEL_FILE): 
-        
-        self.llm = Llama(model_path=mod_path,
-            n_ctx=4096,n_gpu_layers=0,n_threads=13,verbose=False)
+    def __init__(self, mod_path = None): 
+        if (mod_path == None):
+            mod_path = str(config.LLM_MODEL_FILE)
+        self.llm = Llama(model_path=mod_path, n_ctx=4096,n_gpu_layers=0,n_threads=os.cpu_count() - 2,verbose=False)
         self.messages = []
 
     def add_system(self, text):

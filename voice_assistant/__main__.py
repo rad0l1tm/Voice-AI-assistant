@@ -15,18 +15,17 @@ from voice_assistant import wakeword
 from voice_assistant import assistant 
 from voice_assistant import load_dependences
 async def main():
-    config.PROJECT_DIR = str(Path(__file__).parent)
-    print(config.PROJECT_DIR)
     parser = argparse.ArgumentParser(description="Голосовой ассистент")
-    parser.add_argument("--llm-model", help="Путь к llm-модели", default = config.PROJECT_DIR + "/Qwen3.5-4B-Q4_K_M.gguf")
-    parser.add_argument("--stt-model", help="Путь к stt-модели", default = config.PROJECT_DIR + "/stt_model")
+    parser.add_argument("--llm-model", help="Путь к llm-модели", default = config.PROJECT_DIR / "Qwen3.5-4B-Q4_K_M.gguf")
+    parser.add_argument("--stt-model", help="Путь к stt-модели", default = config.PROJECT_DIR / "stt_model")
     parser.add_argument("--vad-model", help="Путь к vad-модели", default = str(Path(silero_vad.__file__).parent / 'data' / 'silero_vad.onnx'))
     parser.add_argument("--load-dependences", action="store_true", help="Автоматически скачать зависимости.")
     args = parser.parse_args()  
     if args.load_dependences:
         load_dependences.ensure_dependencies()
     config.SCREENSHOT_BACKEND_NAME, config._screenshot_capture_fn = utils._detect_screenshot_backend()
-    config.LLM_MODEL_FILE = args.llm_model
+    config.LLM_MODEL_FILE = Path.cwd() / args.llm_model
+    print(config.LLM_MODEL_FILE)
     if config.SCREENSHOT_BACKEND_NAME:
         print(f"[screen] захват экрана включён, инструмент: {config.SCREENSHOT_BACKEND_NAME}")
     else:

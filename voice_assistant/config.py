@@ -3,10 +3,25 @@ import re
 
 from voice_assistant import utils
 
-PROJECT_DIR = ""
+SEX = "male"
+PROJECT_DIR = Path(__file__).resolve().parent
 COMMAND_LISTEN_SECONDS = 5.0
-is_qwenny = False
 ENABLE_BARGE_IN = True
+EXPORT_DIR = PROJECT_DIR / "myword/export"
+SAMPLE_RATE = 16000
+SLOW_FACTOR = 1.4
+WINDOW_SECONDS = 1.0               
+HOP_SECONDS = 0.1                  
+WINDOW_SAMPLES = int(SAMPLE_RATE * WINDOW_SECONDS)
+HOP_SAMPLES = int(SAMPLE_RATE * HOP_SECONDS)
+LAST_MENU_FILE = "assistant_last_menu.json"    
+KNOWN_APPS_FILE = "assistant_known_apps.json"
+VOICE_FILES_DIR = Path.home() / "Documents"
+SCREENSHOT_BACKEND_NAME, _screenshot_capture_fn = None, None
+_FILE_READ_RE = re.compile(r"^(.+?)\s+от\s+(.+?)\s+до\s+(.+)$", re.IGNORECASE)
+STT_MODEL_DIR = PROJECT_DIR / "stt_model"
+LLM_MODEL_FILE = PROJECT_DIR / "Qwen3.5-4B-Q4_K_M.gguf"
+_LINUX_MENU_LAUNCHERS = ("wofi", "rofi", "bemenu")
 
 keyphr = {
     "stdn": "ассистент заверши работу", 
@@ -20,10 +35,11 @@ keyphr = {
 """
 }
 
-LAST_MENU_FILE = "assistant_last_menu.json"    
-KNOWN_APPS_FILE = "assistant_known_apps.json"
-
-
+_SCREENSHOT_BACKENDS = [
+    ("grim", utils._grim_available, utils._grim_capture),
+    ("scrot", utils._scrot_available, utils._scrot_capture),
+    ("import", utils._import_available, utils._import_capture),
+]
 
 RU_NUMBERS = {
     "ноль": 0,
@@ -75,14 +91,6 @@ RU_NUMBERS_KEYS = [
     "миллиард", "миллиарда", "миллиардов",
     "триллион", "триллиона", "триллионов",
 ]
-
-EXPORT_DIR = Path("myword/export")      
-SAMPLE_RATE = 16000
-SLOW_FACTOR = 1.4
-WINDOW_SECONDS = 1.0               
-HOP_SECONDS = 0.1                  
-WINDOW_SAMPLES = int(SAMPLE_RATE * WINDOW_SECONDS)
-HOP_SAMPLES = int(SAMPLE_RATE * HOP_SECONDS)
 
 _SYMBOL_REPLACEMENTS = {
     "™": "", "®": "", "©": "",
@@ -173,18 +181,6 @@ _EN_SINGLE = {
     "v": "в", "w": "в", "x": "кс", "y": "и", "z": "з",
 }
 
-VOICE_FILES_DIR = Path.home() / "Documents"
-SCREENSHOT_BACKEND_NAME, _screenshot_capture_fn = None, None
-_FILE_READ_RE = re.compile(r"^(.+?)\s+от\s+(.+?)\s+до\s+(.+)$", re.IGNORECASE)
-STT_MODEL_DIR = "./stt_model"
-LLM_MODEL_FILE = "./Qwen3.5-4B-Q4_K_M.gguf"
-_SCREENSHOT_BACKENDS = [
-    ("grim", utils._grim_available, utils._grim_capture),
-    ("scrot", utils._scrot_available, utils._scrot_capture),
-    ("import", utils._import_available, utils._import_capture),
-]
-
-_LINUX_MENU_LAUNCHERS = ("wofi", "rofi", "bemenu")
 
 COMMAND_EXAMPLES = {
     "открой меню": [

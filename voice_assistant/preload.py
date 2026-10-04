@@ -47,7 +47,7 @@ def ensure_wakeword_model(
         language="ru",
         speaker="v5_ru",
     )
-    pretovoice(prettsmodel, "Модель обнаружения ключефого слова не найдена. Запускаю запись и обучение.")
+    pretovoice(prettsmodel, "Модель обнаружения ключевого слова не найдена. Запускаю запись и обучение.")
     print("=" * 70)
     print("Wake-word модель не найдена (" + str(export_dir) + ").")
     print("Запускаю запись и обучение через heed-wakeword.")
@@ -61,7 +61,7 @@ def ensure_wakeword_model(
         ).strip() or config.keyphr.get("simj", "ассистент")
 
     if not utils._run_heed(
-        ["init", project_name, "--phrase", phrase],
+        ["init", str(config.PROJECT_DIR/project_name), "--phrase", phrase],
         f"создаю проект '{project_name}' с фразой {phrase!r}",
     ):
         pretovoice(prettsmodel, "не удалось создать проект, настройка модели прервана.")
@@ -74,7 +74,7 @@ def ensure_wakeword_model(
         "громкость и расстояние до микрофона. Нажмите Enter, чтобы начать..."
     )
     if not utils._run_heed(
-        ["record", project_name, "--kind", "positive", "--count", str(positive_count)],
+        ["record", str(config.PROJECT_DIR/project_name), "--kind", "positive", "--count", str(positive_count)],
         "записываю положительные образцы",
     ):
         print("[heed] запись положительных образцов не удалась.")
@@ -86,19 +86,19 @@ def ensure_wakeword_model(
         "похожие по звучанию. Нажмите Enter, чтобы начать..."
     )
     if not utils._run_heed(
-        ["record", project_name, "--kind", "negative", "--count", str(negative_count)],
+        ["record", str(config.PROJECT_DIR/project_name), "--kind", "negative", "--count", str(negative_count)],
         "записываю отрицательные образцы",
     ):
         print("[heed] запись отрицательных образцов не удалась.")
         return False
-    pretovoice(prettsmodel, "Обучаю модель (от нескольких секунд до пары минут)...")
+    pretovoice(prettsmodel, "Обучаю модель. Это займёт от нескольких секунд до пары минут)...")
     print("\nОбучаю модель (от нескольких секунд до пары минут)...")
-    if not utils._run_heed(["train", project_name], "обучаю модель"):
+    if not utils._run_heed(["train", str(config.PROJECT_DIR/project_name)], "обучаю модель"):
         print("[heed] обучение не удалось.")
         return False
     pretovoice(prettsmodel, "Экспортирую модель...")
     print("Экспортирую модель...")
-    if not utils._run_heed(["export", project_name], "экспортирую модель"):
+    if not utils._run_heed(["export", str(config.PROJECT_DIR/project_name)], "экспортирую модель"):
         pretovoice(prettsmodel, "экспорт не удался.")
         print("[heed] экспорт не удался.")
         return False
@@ -115,25 +115,33 @@ def ensure_wakeword_model(
 
 
 def ensure_stt_model(sttdir: Path):
+    prettsmodel, example_text = silero_tts(
+        language="ru",
+        speaker="v5_ru",
+    )
     model_path = ""
     token_path = ""
     if not sttdir.exists():
-        Path(config.PROJECT_DIR + "/stt_model").mkdir(exist_ok=True)
+        pretovoice(prettsmodel, "Модель распознавания речи не найдена. Начинаю скачивание")
+        Path(config.PROJECT_DIR / "stt_model").mkdir(exist_ok=True)
         utils.wget("https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19.tar.bz2", 
-             config.PROJECT_DIR + "/stt_model/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19.tar.bz2")
-        with tarfile.open(config.PROJECT_DIR + "/stt_model/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19.tar.bz2", "r:bz2") as tar:
-            tar.extractall("./stt_model/")
+             config.PROJECT_DIR / "stt_model/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19.tar.bz2")
+        with tarfile.open(config.PROJECT_DIR / "stt_model/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19.tar.bz2", "r:bz2") as tar:
+            tar.extractall(str(config.PROJECT_DIR / "stt_model/"))
         #os.remove("./stt_model/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19.tar.bz2")
-        model_path = config.PROJECT_DIR + "/stt_model/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19/model.int8.onnx"
-        token_path = config.PROJECT_DIR + "/stt_model/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19/tokens.txt"
+        model_path = config.PROJECT_DIR / "stt_model/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19/model.int8.onnx"
+        token_path = config.PROJECT_DIR / "stt_model/sherpa-onnx-nemo-ctc-giga-am-v2-russian-2025-04-19/tokens.txt"
+        pretovoice(prettsmodel, "Скачивание завершено.")
     else:
         model_list = list(sttdir.rglob("*.onnx"))
         token_list = list(sttdir.rglob("tokens.txt"))
         if len(model_list) == 0:
             print("STT модель не найдена.")
+            pretovoice(prettsmodel, "Модель распознавания речи не найдена.")
             return False, "", ""
         if len(token_list) == 0:
             print("Токены STT модели не найдены")
+            pretovoice(prettsmodel, "Токены модели распознавания речи не найдены")
             return False, "", ""
         model_path = str(model_list[0])
         token_path = str(token_list[0])

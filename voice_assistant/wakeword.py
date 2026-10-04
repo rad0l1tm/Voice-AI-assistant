@@ -128,7 +128,6 @@ class HeedWakeWordListener:
                 self._consecutive >= self.consecutive_needed
                 and now - self._last_trigger_time > self.refractory_seconds
             ):
-                print(self._consecutive)
                 self._last_trigger_time = now
                 self._consecutive = 0
                 return Detection(self.name, prob)

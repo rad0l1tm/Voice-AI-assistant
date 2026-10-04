@@ -15,7 +15,7 @@ from voice_assistant import command_executor
 from voice_assistant import stt 
 from voice_assistant import command_processor
 
-
+is_qwenny = False
 
 async def listen_and_transcribe(
     listener: "wakeword.HeedWakeWordListener",
@@ -37,11 +37,12 @@ async def listen_and_transcribe(
         language="ru",
         speaker="v5_ru",
     )
-    await utils.run_blocking(audio.tovoice, ttsmodel, random.choice(["Здравствуйте, сэр.", "Приветствую, сэр."]) + "Под готавливаю данные.")
+    print("Здравствуйте, "+("сэр." if config.SEX=='male' else "мэм."))
+    await utils.run_blocking(audio.tovoice, ttsmodel, random.choice(["Здравствуйте, "+("сээр." if config.SEX=='male' else "мээм."), "Приветствую, "+("сээр." if config.SEX=='male' else "мээм.")]) + "Прошу немного подождать - я подготавливаю данные.")
     qwenny = llm.QwenChat()
     qwenny.add_system(config.keyphr["scs"])
     command_classifier = command_processor.CommandClassifier()
-    await utils.run_blocking(audio.tovoice, ttsmodel, "Данные готовы к работе, сэр.")
+    await utils.run_blocking(audio.tovoice, ttsmodel, "Данные готовы к работе, "+("сэр." if config.SEX=='male' else "мэм."))
 
     while not listener._queue.empty():
         try:
@@ -88,7 +89,6 @@ async def listen_and_transcribe(
                 last_len = len(audio_segment)
                 stuck_counter = 0
     
-            print(nnn)
             nnn += 1
             print(f"segment samples: {len(audio_segment)}, dur={len(audio_segment)/16000:.2f}s")
     
@@ -109,13 +109,13 @@ async def listen_and_transcribe(
             print(text)
             isend, _ = await utils.check_sim(text, config.keyphr["stdn"])
             if isend:
-                await utils.run_blocking(audio.tovoice, ttsmodel, "До свидания, сэр!")
+                await utils.run_blocking(audio.tovoice, ttsmodel, "До свидания, "+("сэр." if config.SEX=='male' else "мэм.")+"!")
                 return ""
 
             words_in_text = text.split()
             first_word = words_in_text[0] if words_in_text else ""
             is_command, _ = await utils.check_sim(first_word, config.keyphr["simj"], thr=65)
-            if not config.is_qwenny or is_command:
+            if not is_qwenny or is_command:
                 if _ == 100:
                     command_text = " ".join(words_in_text[1:])
                 else: 
@@ -123,20 +123,20 @@ async def listen_and_transcribe(
                 if command_text.strip():
                     await command_executor.process_commands(command_text, ttsmodel, qwenny, listener, command_classifier)
                 else:
-                    await utils.run_blocking(audio.tovoice, ttsmodel, random.choice(["Слушаю, сэр.", "Да, сэр."]))
+                    await utils.run_blocking(audio.tovoice, ttsmodel, random.choice(["Слушаю, "+("сэр." if config.SEX=='male' else "мэм."), "Да, "+("сэр." if config.SEX=='male' else "мэм.")]))
 
                 await audio.reset_audio_state(listener, preroll_frames)
                 vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=30)
                 break
 
-            if (config.is_qwenny):
+            if (is_qwenny):
                 response = qwenny.ask(text)
                 response_g = utils.replace_numbers(response)
                 print(qwenny.messages[-1])
     
                 await utils.run_blocking(audio.tovoice, ttsmodel, response_g)
             else:
-                await utils.run_blocking(audio.tovoice, ttsmodel, random.choice(["Не расслышал вас, сэр.", "Не понял вас, сэр."]))
+                await utils.run_blocking(audio.tovoice, ttsmodel, random.choice(["Не расслышал вас, "+("сэр." if config.SEX=='male' else "мэм."), "Не понял вас, "+("сэр." if config.SEX=='male' else "мэм.")]))
 
             await audio.reset_audio_state(listener, preroll_frames)
             vad = sherpa_onnx.VoiceActivityDetector(vad_config, buffer_size_in_seconds=30)
