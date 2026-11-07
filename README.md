@@ -107,6 +107,6 @@ python3 -m voice_assistant --llm-model <path_to_installed_llm>
 
 
 <details>
-  <summary>Скрыто</summary>
-  Поставьте автомат по Python, пожалуйста.
+  <summary>.</summary>
+  РОА
 </details>
